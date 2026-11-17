@@ -1,0 +1,21 @@
+# Entorno local
+.env
+.env.*
+!.env.example
+
+# Editores / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Python (database/seeds-python)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Salidas generadas por los seeds
+database/seeds-python/out/
+
+# El Laravel tiene su propio backend/.gitignore (vendor, storage, etc.)
