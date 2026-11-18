@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Agencia API",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "servers": [
     {
@@ -182,6 +182,40 @@
           }
         }
       }
+    },
+    "/auth/menu": {
+      "get": {
+        "summary": "Menú del usuario autenticado",
+        "description": "Árbol de ítems visibles según los permisos del usuario. Omite ítems inactivos, módulos vacíos y encabezados sin ítems debajo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Menú",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MenuItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, inválido o expirado"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -245,6 +279,54 @@
         "properties": {
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "MenuItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string",
+            "nullable": true,
+            "example": "sales.list"
+          },
+          "name": {
+            "type": "string",
+            "example": "Listado de ventas"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "header",
+              "module",
+              "group",
+              "link"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de la ruta del frontend, no una URL"
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "order": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuItem"
+            }
           }
         }
       }

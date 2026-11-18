@@ -17,6 +17,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolesSeeder::class,
+            MenuItemSeeder::class,
+            // Después del menú: asigna a `admin` todos los permisos, incluidos los que crea el menú.
+            PermissionsSeeder::class,
             AdminUserSeeder::class,
         ]);
     }
