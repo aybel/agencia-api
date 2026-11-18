@@ -56,3 +56,14 @@ Formato corto: contexto, decisión, consecuencia.
 - **Sin registro público:** los usuarios los crea un administrador. No hay contraseña por defecto: `AdminUserSeeder` solo crea el administrador si `ADMIN_PASSWORD` está definido.
 - **Pendiente:** un usuario todavía no se vincula a un `employee`, y no hay permisos finos ni endpoints para administrar usuarios.
 
+## 11. Endpoint `/filter` estructurado por entidad
+- **Decisión:** cada entidad expone `GET|POST /api/v1/<entidades>/filter`, que recibe filtros como `{field, operator, value}`, orden y paginación opcional. La traducción de operadores a SQL vive en un trait compartido (`AppliesStructuredFilters`); cada entidad solo declara sus campos permitidos. El manual de implementación está en [`filtros-avanzados.md`](filtros-avanzados.md).
+- **Origen:** modelo ya usado en otro proyecto. Se conservó el contrato y se ajustó: el trait lanza excepción en lugar de ignorar entradas inválidas, los valores de `LIKE` se escapan, y los campos llevan tipo para que un valor incorrecto dé `422` y no un `500` de PostgreSQL.
+- **Por qué dos barreras:** el Request valida lo que llega del cliente y el trait valida lo que llega al SQL. Una lista de campos desalineada entre ambos falla de forma visible.
+- **Consecuencia:** agregar una entidad son 6 archivos pequeños y dos líneas de configuración. No hay entidades implementadas todavía.
+
+## 12. Versionado de la API por URL
+- **Decisión:** las rutas de negocio van bajo `/api/v1` (`/api/v1/auth/login`, `/api/v1/<entidades>/filter`). Una versión nueva (`v2`) se agrega como otro grupo de rutas, sin tocar `v1`.
+- **Excepción:** `GET /api/ping` queda sin versión, porque es solo una comprobación de vida y no forma parte del contrato.
+- **Consecuencia:** `openapi.json` declara `/api/v1` como servidor y `/api` solo para `/ping`. Las rutas anteriores `/api/auth/*` ya no existen.
+

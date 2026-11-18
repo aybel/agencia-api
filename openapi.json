@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8000/api"
+      "url": "http://localhost:8000/api/v1"
     }
   ],
   "paths": {
@@ -31,7 +31,13 @@
             }
           }
         }
-      }
+      },
+      "servers": [
+        {
+          "url": "http://localhost:8000/api",
+          "description": "Sin versión"
+        }
+      ]
     },
     "/auth/login": {
       "post": {

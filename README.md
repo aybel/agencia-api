@@ -10,7 +10,7 @@ API REST de una agencia de autos con venta de vehículos y taller de servicio. L
 | `docker/` | Dockerfile de PHP-FPM, config de Nginx, init de Postgres |
 | `database/schema/` | DDL puro (`01_schema.sql`) y seed manual (`02_seed_manual.sql`) |
 | `database/seeds-python/` | Seed masivo determinista (`seed.py`) y generador de ruido para el ETL |
-| `docs/` | Modelo de datos y diagrama ER (`er.md`), decisiones de arquitectura (`decisiones.md`) |
+| `docs/` | Modelo de datos y diagrama ER (`er.md`), decisiones de arquitectura (`decisiones.md`), manual de filtros avanzados (`filtros-avanzados.md`) |
 | `openapi.json` | Especificación OpenAPI, se commitea |
 
 ## Servicios
@@ -54,14 +54,16 @@ Detalles, parámetros y reglas de generación en [`database/seeds-python/README.
 
 ## Autenticación y roles
 
+Todas las rutas de negocio van versionadas bajo `/api/v1`. Solo `GET /api/ping` (comprobación de vida) queda sin versión.
+
 Autenticación con JWT ([`php-open-source-saver/jwt-auth`](https://github.com/PHP-Open-Source-Saver/jwt-auth)) y roles con [`spatie/laravel-permission`](https://spatie.be/docs/laravel-permission).
 
 | Método y ruta | Auth | Descripción |
 |---|---|---|
-| `POST /api/auth/login` | No | Recibe `email` y `password`, devuelve el token. Límite de 5 intentos por minuto por email e IP |
-| `GET /api/auth/me` | Bearer | Usuario autenticado con sus roles y permisos |
-| `POST /api/auth/refresh` | Bearer | Emite un token nuevo e invalida el anterior. Acepta un token expirado dentro de 14 días |
-| `POST /api/auth/logout` | Bearer | Invalida el token actual |
+| `POST /api/v1/auth/login` | No | Recibe `email` y `password`, devuelve el token. Límite de 5 intentos por minuto por email e IP |
+| `GET /api/v1/auth/me` | Bearer | Usuario autenticado con sus roles y permisos |
+| `POST /api/v1/auth/refresh` | Bearer | Emite un token nuevo e invalida el anterior. Acepta un token expirado dentro de 14 días |
+| `POST /api/v1/auth/logout` | Bearer | Invalida el token actual |
 
 **Roles:** `admin`, `manager`, `seller`, `service_advisor` y `mechanic` (los cuatro últimos coinciden con `employees.job_title`). Por ahora no hay permisos finos: se agregan cuando existan los endpoints que los necesiten. Para proteger una ruta: `->middleware(['auth:api', 'role:admin|manager'])`.
 
@@ -71,9 +73,9 @@ Autenticación con JWT ([`php-open-source-saver/jwt-auth`](https://github.com/PH
 docker compose exec app php artisan migrate
 docker compose exec app php artisan db:seed      # crea los roles y el administrador
 
-TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -d email=admin@agencia.test --data-urlencode "password=$ADMIN_PASSWORD" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-curl http://localhost:8000/api/auth/me -H "Authorization: Bearer $TOKEN" -H "Accept: application/json"
+curl http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer $TOKEN" -H "Accept: application/json"
 ```
 
 El token dura 60 minutos (`JWT_TTL`). `JWT_SECRET` se genera con `php artisan jwt:secret`; el contenedor lo hace solo al crear `backend/.env`. Nunca lo subas a git. En producción usa `APP_DEBUG=false`.
