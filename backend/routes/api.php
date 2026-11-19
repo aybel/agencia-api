@@ -12,9 +12,8 @@ use Illuminate\Support\Facades\Route;
 | Todas las rutas se sirven bajo el prefijo /api (ej. GET /api/ping).
 */
 
-Route::get('/ping', fn () => response()->json(['status' => 'ok Acceso a la API correcto']));
-
 Route::prefix('v1')->group(function () {
+    Route::get('/ping', fn () => response()->json(['status' => 'ok Acceso a la API correcto']));
 
     Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -27,17 +26,17 @@ Route::prefix('v1')->group(function () {
             // mediante el permiso del usuario
             Route::get('menu', [MenuController::class, 'getUserMenu']);
             Route::post('logout', [AuthController::class, 'logout']);
-        });
-        // Rutas para administrar sucursales
-        Route::prefix('branches')->group(function () {
-            Route::get('/search', [BranchController::class, 'search'])->middleware('permission:branches.view_any');
-            Route::get('/filter', [BranchController::class, 'filter'])->middleware('permission:branches.view_any');
-            Route::get('/', [BranchController::class, 'index'])->middleware('permission:branches.view_any');
-            Route::get('/{id}', [BranchController::class, 'show'])->middleware('permission:branches.view');
-            Route::post('/', [BranchController::class, 'store'])->middleware('permission:branches.create');
-            Route::put('/{id}', [BranchController::class, 'update'])->middleware('permission:branches.update');
-            Route::delete('/{id}', [BranchController::class, 'destroy'])->middleware('permission:branches.delete');
-        });
 
+            // Rutas para administrar sucursales
+            Route::prefix('branches')->group(function () {
+                Route::get('/search', [BranchController::class, 'search'])->middleware('permission:branches.view_any');
+                Route::get('/filter', [BranchController::class, 'filter'])->middleware('permission:branches.view_any');
+                Route::get('/', [BranchController::class, 'index'])->middleware('permission:branches.view_any');
+                Route::get('/{id}', [BranchController::class, 'show'])->middleware('permission:branches.view');
+                Route::post('/', [BranchController::class, 'store'])->middleware('permission:branches.create');
+                Route::put('/{id}', [BranchController::class, 'update'])->middleware('permission:branches.update');
+                Route::delete('/{id}', [BranchController::class, 'destroy'])->middleware('permission:branches.delete');
+            });
+        });
     });
 });

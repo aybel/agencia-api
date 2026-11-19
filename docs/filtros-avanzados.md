@@ -27,7 +27,7 @@ Lo común (cómo se interpreta `eq`, `between`, `in`...) se centraliza en un tra
 **Request**
 
 ```http
-POST /api/v1/cars/filter
+POST /api/v1/auth/cars/filter
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -335,24 +335,28 @@ public array $bindings = [
 
 ### Paso 8. Rutas
 
-En `routes/api.php`, dentro del grupo `v1` que ya existe (las URL quedan `/api/v1/cars/filter`):
+En `routes/api.php`, dentro del grupo `auth:api` que ya existe (las URL quedan `/api/v1/auth/cars/filter`). Es la misma convención de `branches`: cada ruta lleva el permiso de su acción.
 
 ```php
 Route::prefix('v1')->group(function () {
-    // ... rutas existentes (auth, etc.)
+    Route::prefix('auth')->group(function () {
+        Route::middleware('auth:api')->group(function () {
+            // ... rutas existentes (me, menu, logout, branches...)
 
-    Route::middleware('auth:api')->prefix('cars')->group(function () {
-        // Las rutas de filtro van antes de cualquier /{id}.
-        Route::get('filter', [CarController::class, 'filter']);
-        Route::post('filter', [CarController::class, 'filter']);
+            Route::prefix('cars')->group(function () {
+                // Las rutas de filtro van antes de cualquier /{id}.
+                Route::get('/filter', [CarController::class, 'filter'])->middleware('permission:cars.view_any');
+                Route::post('/filter', [CarController::class, 'filter'])->middleware('permission:cars.view_any');
 
-        // Cuando existan las rutas con id, restringe el parámetro:
-        // Route::get('{id}', [CarController::class, 'show'])->whereNumber('id');
+                // Cuando existan las rutas con id, restringe el parámetro:
+                // Route::get('/{id}', [CarController::class, 'show'])->whereNumber('id')->middleware('permission:cars.view');
+            });
+        });
     });
 });
 ```
 
-Para limitar por rol, agrega el middleware: `->middleware(['auth:api', 'role:admin|manager'])`.
+Filtrar es una consulta de listado, así que usa el permiso `view_any`. Ese permiso debe existir: agrega `'cars' => ['view_any', 'view', 'create', 'update', 'delete']` a `RESOURCES` en `database/seeders/PermissionsSeeder.php` y ejecuta `php artisan db:seed --class=PermissionsSeeder` (el rol `admin` lo recibe solo).
 
 ### Paso 9. Formato y verificación
 
@@ -405,7 +409,7 @@ TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
 **Con paginación**
 
 ```bash
-curl -s -X POST http://localhost:8000/api/v1/cars/filter \
+curl -s -X POST http://localhost:8000/api/v1/auth/cars/filter \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{"filters":[{"field":"status","operator":"eq","value":"new"}],
        "order_by":{"column":"price_mxn","direction":"desc"},
@@ -415,7 +419,7 @@ curl -s -X POST http://localhost:8000/api/v1/cars/filter \
 **Sin paginación (todos los registros)**: omite `pagination`.
 
 ```bash
-curl -s -X POST http://localhost:8000/api/v1/cars/filter \
+curl -s -X POST http://localhost:8000/api/v1/auth/cars/filter \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{"filters":[{"field":"brand","operator":"in","value":["Kia","Mazda"]}]}'
 ```
@@ -423,7 +427,7 @@ curl -s -X POST http://localhost:8000/api/v1/cars/filter \
 **Por `GET`** (útil para enlaces y pruebas rápidas; los filtros van en la URL como arreglos):
 
 ```bash
-curl -s -G http://localhost:8000/api/v1/cars/filter \
+curl -s -G http://localhost:8000/api/v1/auth/cars/filter \
   -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
   --data-urlencode "filters[0][field]=status" --data-urlencode "filters[0][operator]=eq" \
   --data-urlencode "filters[0][value]=new" \
@@ -435,7 +439,7 @@ curl -s -G http://localhost:8000/api/v1/cars/filter \
 | HTTP | Cuándo | Ejemplo de causa |
 | --- | --- | --- |
 | `401` | Falta el token o no es válido | Sin cabecera `Authorization` |
-| `403` | El rol no tiene acceso | Ruta con `role:admin` y usuario vendedor |
+| `403` | El usuario no tiene el permiso de la ruta | Usuario sin `cars.view_any` |
 | `422` | La petición no cumple el contrato | Campo u operador no permitido, valor del tipo equivocado, `between` sin dos valores, `limit` mayor a 100, más de 20 filtros |
 | `500` | Error de configuración | El repository recibió algo que el Request dejó pasar (campos desalineados) |
 
@@ -459,10 +463,12 @@ Ejemplo de `422`:
 - [ ] `[Entity]Resource`
 - [ ] Método `filter()` en el controller
 - [ ] Binding en `AppServiceProvider::$bindings`
-- [ ] Rutas `GET` y `POST` de `filter` **antes** de `/{id}`, con `auth:api`
+- [ ] Permisos del recurso en `PermissionsSeeder::RESOURCES`
+- [ ] Rutas `GET` y `POST` de `filter` **antes** de `/{id}`, dentro del grupo `auth:api` y con `permission:<recurso>.view_any`
 - [ ] Probado sin `pagination` (devuelve todos)
 - [ ] Probado con `pagination` (pagina)
 - [ ] Probado un valor inválido (devuelve 422)
+- [ ] Probado un usuario sin el permiso (devuelve 403) y sin token (devuelve 401)
 - [ ] `/filter` no es capturado por `show`
 - [ ] `vendor/bin/pint` sin cambios pendientes
 

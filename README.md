@@ -10,7 +10,7 @@ API REST de una agencia de autos con venta de vehículos y taller de servicio. L
 | `docker/` | Dockerfile de PHP-FPM, config de Nginx, init de Postgres |
 | `database/schema/` | DDL puro (`01_schema.sql`) y seed manual (`02_seed_manual.sql`) |
 | `database/seeds-python/` | Seed masivo determinista (`seed.py`) y generador de ruido para el ETL |
-| `docs/` | Modelo de datos y diagrama ER (`er.md`), decisiones de arquitectura (`decisiones.md`), manual de filtros avanzados (`filtros-avanzados.md`) |
+| `docs/` | Diagrama ER completo (`diagrama-er.md`), modelo de datos del negocio (`er.md`), decisiones de arquitectura (`decisiones.md`), manual de filtros avanzados (`filtros-avanzados.md`) |
 | `openapi.json` | Especificación OpenAPI, se commitea |
 
 ## Servicios
@@ -19,7 +19,7 @@ Postgres, Redis y Mailhog solo escuchan en `127.0.0.1` (ver [`decisiones.md`](do
 
 | Servicio | URL / puerto en el host |
 |---|---|
-| API (Nginx) | http://localhost:8000/api/ping |
+| API (Nginx) | http://localhost:8000/api/v1/ping |
 | PostgreSQL | `127.0.0.1:5432` (db `agencia`, user `agencia`, pass `secret`) |
 | Redis | `127.0.0.1:6379` |
 | Mailhog (bandeja web) | http://localhost:8025 |
@@ -31,7 +31,7 @@ Postgres, Redis y Mailhog solo escuchan en `127.0.0.1` (ver [`decisiones.md`](do
 cp .env.example .env          # opcional: ajusta UID/GID (id -u, id -g) y puertos
 docker compose up -d --build
 docker compose exec app php artisan migrate
-curl http://localhost:8000/api/ping
+curl http://localhost:8000/api/v1/ping
 ```
 
 En el primer arranque, el contenedor `app` ejecuta `composer install` y crea `backend/.env` si faltan.
@@ -54,7 +54,7 @@ Detalles, parámetros y reglas de generación en [`database/seeds-python/README.
 
 ## Autenticación y roles
 
-Todas las rutas de negocio van versionadas bajo `/api/v1`. Solo `GET /api/ping` (comprobación de vida) queda sin versión.
+Todas las rutas van versionadas bajo `/api/v1`, incluida la comprobación de vida (`GET /api/v1/ping`). Los recursos de negocio protegidos se publican en `/api/v1/auth/<recurso>`: dentro del grupo `auth:api`, con el middleware `permission:` de cada ruta.
 
 Autenticación con JWT ([`php-open-source-saver/jwt-auth`](https://github.com/PHP-Open-Source-Saver/jwt-auth)) y roles con [`spatie/laravel-permission`](https://spatie.be/docs/laravel-permission).
 

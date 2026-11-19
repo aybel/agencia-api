@@ -9,6 +9,8 @@ Motor: PostgreSQL 17. El esquema vive en dos lugares que deben mantenerse idént
 
 Los datos se cargan con `database/schema/02_seed_manual.sql` (conjunto pequeño) y `database/seeds-python/seed.py` (volumen). Ver [`database/seeds-python/README.md`](../database/seeds-python/README.md).
 
+> Para ver todas las tablas en un solo diagrama (negocio, usuarios, roles, permisos y menú), consulta [`diagrama-er.md`](diagrama-er.md).
+
 ## Convenciones
 
 El esquema sigue las convenciones de Laravel, para que Eloquent funcione sin configuración extra:

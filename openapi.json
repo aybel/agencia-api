@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Agencia API",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "servers": [
     {
@@ -31,13 +31,7 @@
             }
           }
         }
-      },
-      "servers": [
-        {
-          "url": "http://localhost:8000/api",
-          "description": "Sin versión"
-        }
-      ]
+      }
     },
     "/auth/login": {
       "post": {
