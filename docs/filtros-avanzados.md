@@ -480,6 +480,9 @@ Ejemplo de `422`:
 | Branch | `branches` | Pendiente |
 | Customer | `customers` | Pendiente |
 | Employee | `employees` | Pendiente |
+| JobTitle | `job_titles` | Pendiente |
+| VehicleType | `vehicle_types` | Pendiente |
+| EmployeeSpecialization | `employee_specializations` | Pendiente |
 | Sale | `sales` | Pendiente |
 | ServiceType | `service_types` | Pendiente |
 | ServiceOrder | `service_orders` | Pendiente |
@@ -487,16 +490,31 @@ Ejemplo de `422`:
 
 ### Campos sugeridos (`filterableFields()`)
 
+> **Campos booleanos** (`is_active`, `is_final`): el `FilterRequest` base solo soporta los tipos `string`, `integer`, `numeric` y `date`. Para filtrarlos hay que agregar un tipo `boolean` a `FilterRequest` (reglas `boolean` y operadores `eq`, `ne`, `null`, `notnull`) antes de exponerlos.
+
 | Tabla | Campos y tipos |
 | --- | --- |
 | `branches` | `id` integer, `name` string, `city` string, `address` string, `created_at` date, `updated_at` date |
 | `customers` | `id` integer, `first_name` string, `last_name` string, `email` string, `phone` string, `city` string, `registration_date` date, `created_at` date, `updated_at` date |
-| `employees` | `id` integer, `first_name` string, `last_name` string, `job_title` string, `branch_id` integer, `created_at` date, `updated_at` date |
-| `cars` | `id` integer, `brand` string, `model` string, `model_year` integer, `mileage` integer, `price_mxn` numeric, `status` string, `branch_id` integer, `created_at` date, `updated_at` date |
-| `sales` | `id` integer, `car_id` integer, `customer_id` integer, `employee_id` integer, `sale_date` date, `final_price_mxn` numeric, `created_at` date, `updated_at` date |
-| `service_types` | `id` integer, `name` string, `base_price_mxn` numeric, `created_at` date, `updated_at` date |
-| `service_orders` | `id` integer, `car_id` integer, `customer_id` integer, `employee_id` integer, `check_in_date` date, `delivery_date` date, `total_mxn` numeric, `created_at` date, `updated_at` date |
-| `service_order_items` | `id` integer, `service_order_id` integer, `service_type_id` integer, `applied_cost_mxn` numeric, `created_at` date, `updated_at` date |
+| `employees` | `id` integer, `first_name` string, `last_name` string, `job_title_id` integer, `branch_id` integer, `user_id` integer, `is_active` (booleano: ver nota), `created_at` date, `updated_at` date |
+| `job_titles` | `id` integer, `code` string, `name` string, `is_active` (booleano: ver nota) |
+| `vehicle_types` | `id` integer, `code` string, `name` string, `is_active` (booleano: ver nota) |
+| `employee_specializations` | `id` integer, `employee_id` integer, `vehicle_type_id` integer, `car_condition` string, `created_at` date, `updated_at` date |
+| `cars` | `id` integer, `brand` string, `model` string, `vehicle_type_id` integer, `model_year` integer, `mileage` integer, `price_mxn` numeric, `status` string, `branch_id` integer, `vin` string, `license_plate` string, `color` string, `created_at` date, `updated_at` date |
+| `sales` | `id` integer, `car_id` integer, `customer_id` integer, `employee_id` integer, `branch_id` integer, `status` string, `sale_date` date, `list_price_mxn` numeric, `discount_mxn` numeric, `final_price_mxn` numeric, `tax_mxn` numeric, `net_sale_price_mxn` numeric, `created_at` date, `updated_at` date |
+| `service_types` | `id` integer, `name` string, `base_price_mxn` numeric, `is_active` (booleano: ver nota), `created_at` date, `updated_at` date |
+| `service_orders` | `id` integer, `car_id` integer, `customer_id` integer, `employee_id` integer, `branch_id` integer, `status_id` integer, `check_in_date` date, `estimated_delivery_date` date, `delivery_date` date, `mileage_in` integer, `mileage_out` integer, `total_mxn` numeric, `created_at` date, `updated_at` date |
+| `service_order_items` | `id` integer, `service_order_id` integer, `service_type_id` integer, `part_id` integer, `description` string, `quantity` numeric, `unit_price_mxn` numeric, `applied_cost_mxn` numeric, `approval_status` string, `created_at` date, `updated_at` date |
+| `service_order_statuses` | `id` integer, `code` string, `display_name` string, `is_final` (booleano: ver nota) |
+| `parts` | `id` integer, `sku` string, `name` string, `unit` string, `cost_mxn` numeric, `price_mxn` numeric, `stock` numeric, `is_active` (booleano: ver nota) |
+| `invoices` | `id` integer, `sale_id` integer, `service_order_id` integer, `customer_id` integer, `fiscal_uuid` string, `total_mxn` numeric, `status` string, `issued_at` date |
+| `payments` | `id` integer, `invoice_id` integer, `amount_mxn` numeric, `method` string, `paid_at` date |
+| `sale_addons` | `id` integer, `sale_id` integer, `part_id` integer, `description` string, `total_mxn` numeric |
+| `sale_trade_ins` | `id` integer, `sale_id` integer, `car_id` integer, `vin` string, `brand` string, `model` string, `valuation_price_mxn` numeric |
+| `sale_financings` | `id` integer, `sale_id` integer, `lender_type` string, `bank_name` string, `status` string, `months` integer, `financed_amount_mxn` numeric |
+| `sale_transfers` | `id` integer, `sale_id` integer, `from_employee_id` integer, `to_employee_id` integer, `created_at` date |
+| `commission_rules` | `id` integer, `branch_id` integer, `car_condition` string, `rate` numeric, `effective_from` date, `is_active` (booleano: ver nota) |
+| `sale_commissions` | `id` integer, `sale_id` integer, `employee_id` integer, `commission_rule_id` integer, `role` string, `percentage` numeric, `base_amount_mxn` numeric, `commission_rate` numeric, `commission_amount_mxn` numeric |
 | `users` | Solo `id`, `name`, `email`, `created_at`. Nunca `password`, `remember_token` ni columnas internas. Exponerlo requiere decidir antes qué roles pueden listar usuarios |
 
 ## 9. Consideraciones

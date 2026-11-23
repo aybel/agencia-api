@@ -9,11 +9,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('branches', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100);
-            $table->string('city', 50);
-            $table->string('address', 150);
-            $table->timestamps();
+            $table->comment('Sucursales de la agencia');
+            $table->id()->comment('Identificador único de la sucursal');
+            $table->string('name', 100)->comment('Nombre de la sucursal');
+            $table->string('city', 50)->comment('Ciudad donde se ubica');
+            $table->string('address', 150)->comment('Dirección completa');
+            $table->timestamp('created_at')->nullable()->comment('Fecha y hora de creación del registro');
+            $table->timestamp('updated_at')->nullable()->comment('Fecha y hora de la última modificación del registro');
         });
     }
 

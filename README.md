@@ -10,7 +10,7 @@ API REST de una agencia de autos con venta de vehículos y taller de servicio. L
 | `docker/` | Dockerfile de PHP-FPM, config de Nginx, init de Postgres |
 | `database/schema/` | DDL puro (`01_schema.sql`) y seed manual (`02_seed_manual.sql`) |
 | `database/seeds-python/` | Seed masivo determinista (`seed.py`) y generador de ruido para el ETL |
-| `docs/` | Diagrama ER completo (`diagrama-er.md`), modelo de datos del negocio (`er.md`), decisiones de arquitectura (`decisiones.md`), manual de filtros avanzados (`filtros-avanzados.md`) |
+| `docs/` | Diagrama ER completo (`diagrama-er.md`), modelo de datos del negocio (`er.md`), módulo de ventas (`arquitectura-ventas.md`), módulo de servicio y facturación (`arquitectura_servicios.md`), decisiones de arquitectura (`decisiones.md`), manual de filtros avanzados (`filtros-avanzados.md`) |
 | `openapi.json` | Especificación OpenAPI, se commitea |
 
 ## Servicios
@@ -52,6 +52,14 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 Detalles, parámetros y reglas de generación en [`database/seeds-python/README.md`](database/seeds-python/README.md).
 
+**Si tu base ya estaba migrada** (antes del módulo de servicio), las migraciones cambiaron en su lugar y `php artisan migrate` no las vuelve a aplicar. Recrea la base y recarga todo. **Esto borra los datos de la base de desarrollo**; los seeds son deterministas y los regeneran:
+
+```bash
+docker compose exec app php artisan migrate:fresh --seed   # esquema, roles, menú, permisos y administrador
+docker compose exec -T postgres psql -U agencia -d agencia -v ON_ERROR_STOP=1 < database/schema/02_seed_manual.sql
+database/seeds-python/.venv/bin/python database/seeds-python/seed.py --dsn postgresql://agencia:secret@localhost:5432/agencia
+```
+
 ## Autenticación y roles
 
 Todas las rutas van versionadas bajo `/api/v1`, incluida la comprobación de vida (`GET /api/v1/ping`). Los recursos de negocio protegidos se publican en `/api/v1/auth/<recurso>`: dentro del grupo `auth:api`, con el middleware `permission:` de cada ruta.
@@ -66,7 +74,7 @@ Autenticación con JWT ([`php-open-source-saver/jwt-auth`](https://github.com/PH
 | `GET /api/v1/auth/menu` | Bearer | Menú del usuario, filtrado por sus permisos (ver [Menú del usuario](#menú-del-usuario)) |
 | `POST /api/v1/auth/logout` | Bearer | Invalida el token actual |
 
-**Roles:** `admin`, `manager`, `seller`, `service_advisor` y `mechanic` (los cuatro últimos coinciden con `employees.job_title`). Los permisos de cada recurso y el menú se describen en [Permisos y menú](#permisos-y-menú).
+**Roles:** `admin`, `manager`, `seller`, `service_advisor` y `mechanic` (los cuatro últimos corresponden a los puestos de `job_titles`; el rol que se sugiere para cada puesto se guarda en `job_title_role`, y con qué autos trabaja cada empleado, en `employee_specializations`). Los permisos de cada recurso y el menú se describen en [Permisos y menú](#permisos-y-menú).
 
 **Primer administrador:** define `ADMIN_EMAIL` y `ADMIN_PASSWORD` en `backend/.env` y ejecuta el seeder. Sin `ADMIN_PASSWORD` no se crea ningún usuario.
 
@@ -230,6 +238,16 @@ Ejemplo con los ítems de muestra: un usuario sin permisos solo ve `dashboard`; 
 Cada ítem de menú es independiente del frontend: `route` es el nombre de una ruta del frontend, no una URL, e `icon` es un nombre semántico que el frontend traduce a un icono.
 
 Para armar el menú desde código, `MenuItem` también trae los scopes `active()`, `root()` y `forUser($user)`. Si los usas directamente, filtra también los hijos con `forUser` y poda los encabezados vacíos, porque el scope por sí solo no lo hace.
+
+## Diccionario de datos
+
+Cada tabla y cada columna del proyecto tiene un comentario en la base de datos que explica qué guarda, sus unidades y sus valores válidos (por ejemplo `1: activo, 0: dado de baja`). Se escribe en las migraciones con `->comment()` y se consulta sin salir de la base:
+
+```bash
+docker compose exec postgres psql -U agencia -d agencia -c "\d+ sales"
+```
+
+En HeidiSQL aparece en la columna **Comentario** de la pestaña de la tabla. Las columnas nuevas deben llevar siempre su `->comment()` (el comentario va **antes** de `->constrained()` en las llaves foráneas). Ver la decisión 15 de [`docs/decisiones.md`](docs/decisiones.md).
 
 ## Acceder a la base de datos con HeidiSQL
 
