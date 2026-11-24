@@ -2,14 +2,13 @@
 
 namespace App\Repositories;
 
-use App\Models\MenuItem;
-use App\Models\User;
+use App\Models\Branch;
 use Illuminate\Support\Collection;
 
 class BranchRepository extends Repository
 {
     public function model()
     {
-        return 'App\Models\Branch';
+        return Branch::class;
     }
 }
