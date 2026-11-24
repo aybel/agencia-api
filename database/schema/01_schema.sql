@@ -6,7 +6,7 @@
 --
 --   psql -U agencia -d agencia -f database/schema/01_schema.sql
 --
--- BORRA las 23 tablas del negocio, las ventas y el taller si ya existen.
+-- BORRA las 25 tablas del negocio, las ventas y el taller si ya existen.
 -- No lo ejecutes si ya usaste `php artisan migrate`, salvo que quieras
 -- reemplazar las tablas (la tabla `migrations` de Laravel no se toca).
 --
@@ -23,6 +23,9 @@
 -- Cada tabla y cada columna tiene un comentario (COMMENT ON, al final de este archivo): son el
 -- diccionario de datos de la base. Se ven con \d+ <tabla> en psql, o en HeidiSQL.
 --
+-- Las entidades y los municipios (states, cities) los carga database/schema/01_catalogos_mx.sql, a partir
+-- de los CSV de backend/database/seeders/data. Sucursales y clientes los referencian por city_id.
+--
 -- Al final también se insertan los 5 puestos de los empleados, los 5 tipos de vehículo y los 7 estatus de las órdenes de
 -- servicio: son datos de referencia que el código necesita y que las migraciones también insertan.
 -- ==========================================================
@@ -31,7 +34,7 @@ DROP TABLE IF EXISTS sale_commissions, commission_rules, sale_transfers, sale_fi
                      payments, invoices, service_order_histories, service_order_items, service_orders,
                      parts, service_order_statuses, service_types,
                      sales, employee_specializations, cars, vehicle_types, employees, job_title_role, job_titles,
-                     customers, branches CASCADE;
+                     customers, branches, cities, states CASCADE;
 
 CREATE TABLE IF NOT EXISTS users (
     id                BIGSERIAL PRIMARY KEY,
@@ -55,13 +58,35 @@ CREATE TABLE IF NOT EXISTS roles (
     CONSTRAINT roles_name_guard_name_unique UNIQUE (name, guard_name)
 );
 
+CREATE TABLE states (
+    id         BIGSERIAL PRIMARY KEY,
+    code       VARCHAR(2)   NOT NULL,
+    short_name VARCHAR(6)   NOT NULL,
+    name       VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP(0) WITHOUT TIME ZONE,
+    updated_at TIMESTAMP(0) WITHOUT TIME ZONE
+);
+
+CREATE TABLE cities (
+    id         BIGSERIAL PRIMARY KEY,
+    state_id   BIGINT       NOT NULL,
+    code       VARCHAR(3)   NOT NULL,
+    name       VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP(0) WITHOUT TIME ZONE,
+    updated_at TIMESTAMP(0) WITHOUT TIME ZONE,
+    CONSTRAINT cities_state_id_foreign
+        FOREIGN KEY (state_id) REFERENCES states (id) ON DELETE RESTRICT
+);
+
 CREATE TABLE branches (
     id         BIGSERIAL PRIMARY KEY,
     name       VARCHAR(100) NOT NULL,
-    city       VARCHAR(50)  NOT NULL,
+    city_id    BIGINT       NOT NULL,
     address    VARCHAR(150) NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE
+    updated_at TIMESTAMP(0) WITHOUT TIME ZONE,
+    CONSTRAINT branches_city_id_foreign
+        FOREIGN KEY (city_id) REFERENCES cities (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE customers (
@@ -70,11 +95,13 @@ CREATE TABLE customers (
     last_name         VARCHAR(50)  NOT NULL,
     email             VARCHAR(100) NOT NULL,
     phone             VARCHAR(15),
-    city              VARCHAR(50),
+    city_id           BIGINT       NOT NULL,
     registration_date DATE DEFAULT '2023-01-01',
     created_at        TIMESTAMP(0) WITHOUT TIME ZONE,
     updated_at        TIMESTAMP(0) WITHOUT TIME ZONE,
-    CONSTRAINT customers_email_unique UNIQUE (email)
+    CONSTRAINT customers_email_unique UNIQUE (email),
+    CONSTRAINT customers_city_id_foreign
+        FOREIGN KEY (city_id) REFERENCES cities (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE job_titles (
@@ -619,10 +646,26 @@ COMMENT ON COLUMN users.remember_token IS 'Token de sesión recordada';
 COMMENT ON COLUMN users.created_at IS 'Fecha y hora de creación del registro';
 COMMENT ON COLUMN users.updated_at IS 'Fecha y hora de la última modificación del registro';
 
+COMMENT ON TABLE states IS 'Estados de México';
+COMMENT ON COLUMN states.id IS 'Identificador único del estado';
+COMMENT ON COLUMN states.code IS 'Clave de la entidad federativa (INEGI), de dos dígitos. Por ejemplo 09';
+COMMENT ON COLUMN states.short_name IS 'Nombre abreviado. Por ejemplo CDMX o Q. Roo';
+COMMENT ON COLUMN states.name IS 'Nombre completo de la entidad. Por ejemplo Ciudad de México';
+COMMENT ON COLUMN states.created_at IS 'Fecha y hora de creación del registro';
+COMMENT ON COLUMN states.updated_at IS 'Fecha y hora de la última modificación del registro';
+
+COMMENT ON TABLE cities IS 'Municipios de México';
+COMMENT ON COLUMN cities.id IS 'Identificador único del municipio';
+COMMENT ON COLUMN cities.state_id IS 'Entidad federativa a la que pertenece (states.id)';
+COMMENT ON COLUMN cities.code IS 'Clave del municipio (INEGI), de tres dígitos. Se repite entre entidades: la clave completa es entidad más municipio';
+COMMENT ON COLUMN cities.name IS 'Nombre del municipio o alcaldía. Por ejemplo Cuauhtémoc';
+COMMENT ON COLUMN cities.created_at IS 'Fecha y hora de creación del registro';
+COMMENT ON COLUMN cities.updated_at IS 'Fecha y hora de la última modificación del registro';
+
 COMMENT ON TABLE branches IS 'Sucursales de la agencia';
 COMMENT ON COLUMN branches.id IS 'Identificador único de la sucursal';
 COMMENT ON COLUMN branches.name IS 'Nombre de la sucursal';
-COMMENT ON COLUMN branches.city IS 'Ciudad donde se ubica';
+COMMENT ON COLUMN branches.city_id IS 'Municipio donde se ubica la sucursal (cities.id)';
 COMMENT ON COLUMN branches.address IS 'Dirección completa';
 COMMENT ON COLUMN branches.created_at IS 'Fecha y hora de creación del registro';
 COMMENT ON COLUMN branches.updated_at IS 'Fecha y hora de la última modificación del registro';
@@ -633,7 +676,7 @@ COMMENT ON COLUMN customers.first_name IS 'Nombre(s) del cliente';
 COMMENT ON COLUMN customers.last_name IS 'Apellido(s) del cliente';
 COMMENT ON COLUMN customers.email IS 'Correo electrónico. No se repite entre clientes';
 COMMENT ON COLUMN customers.phone IS 'Teléfono de contacto';
-COMMENT ON COLUMN customers.city IS 'Ciudad de residencia';
+COMMENT ON COLUMN customers.city_id IS 'Municipio de residencia del cliente (cities.id)';
 COMMENT ON COLUMN customers.registration_date IS 'Fecha de alta del cliente. Por defecto 2023-01-01';
 COMMENT ON COLUMN customers.created_at IS 'Fecha y hora de creación del registro';
 COMMENT ON COLUMN customers.updated_at IS 'Fecha y hora de la última modificación del registro';

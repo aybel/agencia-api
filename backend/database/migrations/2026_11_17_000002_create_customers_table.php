@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('last_name', 50)->comment('Apellido(s) del cliente');
             $table->string('email', 100)->unique()->comment('Correo electrónico. No se repite entre clientes');
             $table->string('phone', 15)->nullable()->comment('Teléfono de contacto');
-            $table->string('city', 50)->nullable()->comment('Ciudad de residencia');
+            $table->foreignId('city_id')->comment('Municipio de residencia del cliente (cities.id)')->constrained('cities')->restrictOnDelete();
             $table->date('registration_date')->nullable()->default('2023-01-01')->comment('Fecha de alta del cliente. Por defecto 2023-01-01');
             $table->timestamp('created_at')->nullable()->comment('Fecha y hora de creación del registro');
             $table->timestamp('updated_at')->nullable()->comment('Fecha y hora de la última modificación del registro');

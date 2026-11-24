@@ -41,6 +41,11 @@ En el primer arranque, el contenedor `app` ejecuta `composer install` y crea `ba
 El modelo y las reglas de los datos están en [`docs/er.md`](docs/er.md). Con las migraciones aplicadas:
 
 ```bash
+# 0. Entidades y municipios (INEGI): sucursales y clientes los referencian. Se pueden repetir sin duplicar
+docker compose exec app php artisan db:seed --class=StateSeeder
+docker compose exec app php artisan db:seed --class=CitySeeder
+# Sin Laravel: psql ... < database/schema/01_catalogos_mx.sql (solo si las tablas están vacías)
+
 # 1. Seed manual: conjunto pequeño (vacía las tablas y reinicia los ids)
 docker compose exec -T postgres psql -U agencia -d agencia -v ON_ERROR_STOP=1 < database/schema/02_seed_manual.sql
 
@@ -55,7 +60,7 @@ Detalles, parámetros y reglas de generación en [`database/seeds-python/README.
 **Si tu base ya estaba migrada** (antes del módulo de servicio), las migraciones cambiaron en su lugar y `php artisan migrate` no las vuelve a aplicar. Recrea la base y recarga todo. **Esto borra los datos de la base de desarrollo**; los seeds son deterministas y los regeneran:
 
 ```bash
-docker compose exec app php artisan migrate:fresh --seed   # esquema, roles, menú, permisos y administrador
+docker compose exec app php artisan migrate:fresh --seed   # esquema, entidades y municipios, roles, menú, permisos y administrador
 docker compose exec -T postgres psql -U agencia -d agencia -v ON_ERROR_STOP=1 < database/schema/02_seed_manual.sql
 database/seeds-python/.venv/bin/python database/seeds-python/seed.py --dsn postgresql://agencia:secret@localhost:5432/agencia
 ```

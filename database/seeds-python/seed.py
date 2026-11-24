@@ -5,6 +5,7 @@ un generador aleatorio, así que cada ejecución produce exactamente los mismos 
 
 Requisitos:
     * El esquema creado (php artisan migrate o database/schema/01_schema.sql).
+    * El catálogo de entidades y municipios (php artisan db:seed o database/schema/01_catalogos_mx.sql).
     * El seed manual cargado (database/schema/02_seed_manual.sql): este script
       continúa los ids de ese seed y aborta si las tablas no coinciden con él.
 
@@ -18,12 +19,14 @@ Se aplica en una sola transacción: si algo falla, no se agrega nada.
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 import zlib
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from math import floor
+from pathlib import Path
 
 # ----------------------------------------------------------------------------
 # Datos de referencia
@@ -34,7 +37,11 @@ BASE = {
     "branches": 3, "employees": 5, "customers": 12, "cars": 17,
     "sales": 12, "service_types": 7, "service_orders": 8, "service_order_items": 11,
 }
-CIUDADES_BASE = {1: "Ciudad de México", 2: "Guadalajara", 3: "Monterrey"}
+# Municipio de cada sucursal, como (clave de entidad, clave de municipio) del INEGI. Los clientes viven en el
+# municipio de la sucursal donde compran. La Ciudad de México no tiene un municipio con ese nombre: se usa la
+# alcaldía Cuauhtémoc (09-015), donde está la Av. Juárez de la sucursal Centro.
+MUNICIPIOS_BASE = {1: ("09", "015"), 2: ("14", "039"), 3: ("19", "039")}  # Cuauhtémoc, Guadalajara, Monterrey
+CSV_MUNICIPIOS = Path(__file__).resolve().parents[2] / "backend" / "database" / "seeders" / "data" / "cities.csv"
 EMPLEADOS_BASE = [  # (id, clave interna del puesto, branch_id)
     (1, "seller", 1), (2, "manager", 2), (3, "seller", 3),
     (4, "service_advisor", 1), (5, "mechanic", 1),
@@ -44,9 +51,9 @@ EMPLEADOS_BASE = [  # (id, clave interna del puesto, branch_id)
 EPOCH = datetime(2021, 1, 1)
 
 SUCURSALES_NUEVAS = [
-    (4, "Sucursal Angelópolis", "Puebla", "Blvd. Atlixcáyotl 1500"),
-    (5, "Sucursal Bajío", "Querétaro", "Av. Constituyentes 820"),
-    (6, "Sucursal Frontera", "Tijuana", "Blvd. Agua Caliente 3400"),
+    (4, "Sucursal Angelópolis", ("21", "114"), "Blvd. Atlixcáyotl 1500"),  # Puebla
+    (5, "Sucursal Bajío", ("22", "014"), "Av. Constituyentes 820"),  # Querétaro
+    (6, "Sucursal Frontera", ("02", "004"), "Blvd. Agua Caliente 3400"),  # Tijuana
 ]
 
 # (clave interna del puesto, etiqueta en español usada como semilla del CRC32, cantidad por sucursal).
@@ -112,10 +119,10 @@ LADA_POR_SUCURSAL = {1: "555", 2: "333", 3: "818", 4: "222", 5: "442", 6: "664"}
 # created_at y updated_at.
 _TS = ["created_at", "updated_at"]
 TABLAS: dict[str, list[str]] = {
-    "branches": ["id", "name", "city", "address", *_TS],
+    "branches": ["id", "name", "city_id", "address", *_TS],
     "employees": ["id", "first_name", "last_name", "job_title_id", "branch_id", *_TS],
     "service_types": ["id", "name", "base_price_mxn", *_TS],
-    "customers": ["id", "first_name", "last_name", "email", "phone", "city", "registration_date", *_TS],
+    "customers": ["id", "first_name", "last_name", "email", "phone", "city_id", "registration_date", *_TS],
     "cars": ["id", "brand", "model", "vehicle_type_id", "model_year", "mileage", "price_mxn", "status", "branch_id", *_TS],
     "sales": [
         "id", "car_id", "customer_id", "employee_id", "branch_id", "status", "sale_date", "car_status_at_sale",
@@ -177,6 +184,10 @@ CODIGO_DE_PUESTO = {"seller": "01", "manager": "02", "service_advisor": "03", "m
 JOB_TITLE_IDS_POR_DEFECTO = {"seller": 1, "manager": 2, "service_advisor": 3, "mechanic": 5}
 # Ids de vehicle_types tal como los crea la migración.
 VEHICLE_TYPE_IDS_POR_DEFECTO = {"auto": 1, "suv": 2, "pickup": 3, "van": 4, "truck": 5}
+def municipios_desde_csv() -> dict[tuple[str, str], int]:
+    """Ids de cities tal como los crea CitySeeder: el orden del archivo (1, 2, 3...). Solo para el dry-run."""
+    with CSV_MUNICIPIOS.open(encoding="utf-8", newline="") as f:
+        return {(fila["CVE_ENT"], fila["CVE_MUN"]): n for n, fila in enumerate(csv.DictReader(f), start=1)}
 
 
 def generar(
@@ -184,22 +195,25 @@ def generar(
     delivered_status_id: int = 6,
     job_title_ids: dict[str, int] | None = None,
     vehicle_type_ids: dict[str, int] | None = None,
+    city_ids: dict[tuple[str, str], int] | None = None,
 ) -> dict[str, list[tuple]]:
     """`delivered_status_id` es el id del estatus `delivered` en service_order_statuses.
 
     `job_title_ids` mapea la clave interna de cada puesto (`seller`, `mechanic`...) al id de job_titles. En el dry-run se usan los
     que crean las migraciones; al aplicar se consultan a la base.
     `vehicle_type_ids` mapea el código de cada tipo de vehículo (`auto`, `suv`...) al id de vehicle_types, con la misma regla.
+    `city_ids` mapea (clave de entidad, clave de municipio) al id de cities. En el dry-run se leen de cities.csv.
     """
     job_title_ids = job_title_ids or JOB_TITLE_IDS_POR_DEFECTO
     vehicle_type_ids = vehicle_type_ids or VEHICLE_TYPE_IDS_POR_DEFECTO
+    city_ids = city_ids or municipios_desde_csv()
     t: dict[str, list[tuple]] = {nombre: [] for nombre in TABLAS}
-    ciudad = dict(CIUDADES_BASE)
+    ciudad = dict(MUNICIPIOS_BASE)  # id de sucursal -> (entidad, municipio)
 
     # 1. Sucursales
-    for id_suc, nombre, city, direccion in SUCURSALES_NUEVAS:
-        t["branches"].append((id_suc, nombre, city, direccion, EPOCH, EPOCH))
-        ciudad[id_suc] = city
+    for id_suc, nombre, municipio, direccion in SUCURSALES_NUEVAS:
+        t["branches"].append((id_suc, nombre, city_ids[municipio], direccion, EPOCH, EPOCH))
+        ciudad[id_suc] = municipio
 
     # 2. Empleados: por sucursal 1 asesor, 2 mecánicos y 2 vendedores, y un gerente donde no hay.
     empleados = list(EMPLEADOS_BASE)  # (id, clave interna del puesto, branch_id)
@@ -260,7 +274,7 @@ def generar(
             APELLIDOS[crc(f"cli-ape-{cli}") % 30],
             f"cliente{id_cliente:05d}@example.com",
             f"{LADA_POR_SUCURSAL[suc]}-{crc(f'cli-tel-{cli}') % 10000:04d}",
-            ciudad[suc],
+            city_ids[ciudad[suc]],
             registro, ts(registro), ts(registro),
         ))
 
@@ -408,11 +422,19 @@ def tipos_de_vehiculo(cur) -> dict[str, int]:
     if faltan:
         sys.exit(f"Abortado: faltan los tipos de vehículo {faltan} en vehicle_types. Ejecuta php artisan migrate.")
     return por_codigo
+def municipios(cur) -> dict[tuple[str, str], int]:
+    cur.execute("SELECT s.code, c.code, c.id FROM cities c JOIN states s ON s.id = c.state_id")
+    por_clave = {(ent, mun): id_ for ent, mun, id_ in cur.fetchall()}
+    usados = set(MUNICIPIOS_BASE.values()) | {m for _id, _n, m, _d in SUCURSALES_NUEVAS}
+    faltan = sorted(usados - por_clave.keys())
+    if faltan:
+        sys.exit(f"Abortado: faltan los municipios {faltan} en cities. Ejecuta php artisan db:seed o 01_catalogos_mx.sql.")
+    return por_clave
 def aplicar(dsn: str, params: Parametros) -> dict[str, list[tuple]]:
     import psycopg
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
-        datos = generar(params, estatus_entregado(cur), puestos(cur), tipos_de_vehiculo(cur))
+        datos = generar(params, estatus_entregado(cur), puestos(cur), tipos_de_vehiculo(cur), municipios(cur))
         # El script continúa los ids del seed manual: comprobar que es el estado actual.
         for tabla in TABLAS:
             cur.execute(f"SELECT COUNT(*), COALESCE(MAX(id), 0) FROM {tabla}")

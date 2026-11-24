@@ -12,7 +12,7 @@ return new class extends Migration
             $table->comment('Sucursales de la agencia');
             $table->id()->comment('Identificador único de la sucursal');
             $table->string('name', 100)->comment('Nombre de la sucursal');
-            $table->string('city', 50)->comment('Ciudad donde se ubica');
+            $table->foreignId('city_id')->comment('Municipio donde se ubica la sucursal (cities.id)')->constrained('cities')->restrictOnDelete();
             $table->string('address', 150)->comment('Dirección completa');
             $table->timestamp('created_at')->nullable()->comment('Fecha y hora de creación del registro');
             $table->timestamp('updated_at')->nullable()->comment('Fecha y hora de la última modificación del registro');

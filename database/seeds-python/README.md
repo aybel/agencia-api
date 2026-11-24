@@ -1,10 +1,10 @@
 # Seeds de la base `agencia`
 
-Dos pasos, en este orden. El segundo continúa los ids del primero y aborta si las tablas no están como las deja el primero.
+Antes, el catálogo de entidades y municipios (`php artisan db:seed`, o `../schema/01_catalogos_mx.sql` si no usas Laravel). Después, dos pasos, en este orden. El segundo continúa los ids del primero y aborta si las tablas no están como las deja el primero.
 
 | Orden | Archivo | Qué hace |
 | --- | --- | --- |
-| 0 | `php artisan migrate` o `../schema/01_schema.sql` | Crea las 8 tablas |
+| 0 | `php artisan migrate` y `db:seed` (o `../schema/01_schema.sql` y `../schema/01_catalogos_mx.sql`) | Crea las tablas y carga entidades, municipios y los demás catálogos |
 | 1 | [`../schema/02_seed_manual.sql`](../schema/02_seed_manual.sql) | Vacía las tablas y carga un conjunto pequeño y legible, escrito a mano |
 | 2 | [`seed.py`](seed.py) | Agrega volumen: 2,000 ventas y 4,000 órdenes de servicio, más datos en las demás tablas |
 
@@ -15,6 +15,10 @@ Dos pasos, en este orden. El segundo continúa los ids del primero y aborta si l
 Con el stack de Docker levantado (`docker compose up -d`) y las migraciones aplicadas:
 
 ```bash
+# 0. Entidades y municipios (si no los cargó ya `migrate --seed`)
+docker compose exec app php artisan db:seed --class=StateSeeder
+docker compose exec app php artisan db:seed --class=CitySeeder
+
 # 1. Seed manual (vacía las tablas y reinicia los ids)
 docker compose exec -T postgres psql -U agencia -d agencia -v ON_ERROR_STOP=1 < database/schema/02_seed_manual.sql
 
@@ -77,9 +81,9 @@ Parámetros por defecto (en la clase `Parametros`):
 
 | Tabla | Regla |
 | --- | --- |
-| `branches` | Agrega Puebla, Querétaro y Tijuana (ids 4 a 6) |
+| `branches` | Agrega Puebla, Querétaro y Tijuana (ids 4 a 6), cada una con su municipio del catálogo `cities` (`city_id`). La Ciudad de México usa la alcaldía Cuauhtémoc |
 | `employees` | Cada empleado tiene un puesto del catálogo `job_titles` (el seed no genera `04 Jefe Mecánico`). Por sucursal: 2 vendedores, 1 asesor de servicio y 2 mecánicos. Agrega un gerente donde no hay |
-| `customers` | Un cliente por cada primera compra. Se registra de 0 a 20 días antes de comprar. Email `clienteNNNNN@example.com`. La ciudad es la de la sucursal donde compra. El teléfono lleva lada de la ciudad |
+| `customers` | Un cliente por cada primera compra. Se registra de 0 a 20 días antes de comprar. Email `clienteNNNNN@example.com`. El municipio (`city_id`) es el de la sucursal donde compra. El teléfono lleva lada de la ciudad |
 | `cars` | Catálogo de 30 modelos con precio base y tipo de vehículo (`vehicle_types`: 16 `auto`, 11 `suv` y 3 `pickup`); los primeros se eligen con más frecuencia. En los vendidos, 60 % son nuevos (0 km) y 40 % usados de 1 a 8 años. El precio base (referencia 2024) baja 4 % por cada año que la venta es anterior a 2024, y otro 8 % por cada año de uso del auto. Inventario: 55 % nuevos y el resto usados de 1 a 6 años |
 | `sales` | Todas se cargan `completed`, con la sucursal y el precio de lista del auto, el descuento como diferencia con el precio final, el IVA del 16 % contenido y el precio neto (final menos IVA, sin accesorios). Fechas distribuidas en 912 días (2022-01-01 a 2024-06-30), con un auto por venta. El vendedor es de la sucursal del auto. El precio final es de 94 % a 100 % del precio de lista. Cerca del 72 % de las ventas son de clientes nuevos y el resto son clientes recurrentes (381 clientes compran más de una vez) |
 | `service_orders` | Todas se cargan `delivered` y con la sucursal del auto, sin kilometraje ni notas. 8 % son revisiones previas a la venta (1 a 10 días antes, sin cliente), 85 % son servicios posteriores a la venta a nombre del comprador, y 7 % son servicios a autos del inventario (sin cliente, en los últimos 182 días). Los autos vendidos hace más tiempo reciben más servicios. La entrega es de 0 a 3 días después del ingreso. La atiende un asesor o mecánico de la sucursal del auto |

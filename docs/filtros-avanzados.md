@@ -480,6 +480,8 @@ Ejemplo de `422`:
 | Branch | `branches` | Pendiente |
 | Customer | `customers` | Pendiente |
 | Employee | `employees` | Pendiente |
+| State | `states` | Pendiente |
+| City | `cities` | Pendiente |
 | JobTitle | `job_titles` | Pendiente |
 | VehicleType | `vehicle_types` | Pendiente |
 | EmployeeSpecialization | `employee_specializations` | Pendiente |
@@ -494,9 +496,11 @@ Ejemplo de `422`:
 
 | Tabla | Campos y tipos |
 | --- | --- |
-| `branches` | `id` integer, `name` string, `city` string, `address` string, `created_at` date, `updated_at` date |
-| `customers` | `id` integer, `first_name` string, `last_name` string, `email` string, `phone` string, `city` string, `registration_date` date, `created_at` date, `updated_at` date |
+| `branches` | `id` integer, `name` string, `city_id` integer, `address` string, `created_at` date, `updated_at` date |
+| `customers` | `id` integer, `first_name` string, `last_name` string, `email` string, `phone` string, `city_id` integer, `registration_date` date, `created_at` date, `updated_at` date |
 | `employees` | `id` integer, `first_name` string, `last_name` string, `job_title_id` integer, `branch_id` integer, `user_id` integer, `is_active` (booleano: ver nota), `created_at` date, `updated_at` date |
+| `states` | `id` integer, `code` string, `short_name` string, `name` string |
+| `cities` | `id` integer, `state_id` integer, `code` string, `name` string |
 | `job_titles` | `id` integer, `code` string, `name` string, `is_active` (booleano: ver nota) |
 | `vehicle_types` | `id` integer, `code` string, `name` string, `is_active` (booleano: ver nota) |
 | `employee_specializations` | `id` integer, `employee_id` integer, `vehicle_type_id` integer, `car_condition` string, `created_at` date, `updated_at` date |

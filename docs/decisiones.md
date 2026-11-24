@@ -102,7 +102,7 @@ Formato corto: contexto, decisión, consecuencia.
 - **Formato:** una frase que dice qué es, y para columnas con valores fijos, la lista `valor: significado` (por ejemplo `1: activo, 0: dado de baja`). Las llaves foráneas indican a qué apuntan (`branches.id`) y las unidades se explican (pesos, km, con o sin IVA).
 - **Por qué en la base y no solo en los documentos:** el comentario viaja con el esquema. Se ve con `\d+ <tabla>` en `psql`, en HeidiSQL (columna "Comentario") y en cualquier herramienta que lea `information_schema`, y no se desfasa del código como un documento aparte.
 - **Llaves foráneas:** el `->comment()` debe ir **antes** de `->constrained()`. Después se aplicaría a la restricción y no a la columna.
-- **Alcance:** las 25 tablas del proyecto (negocio, ventas, taller, `users` y `menu_items`). Las tablas internas de Laravel (`cache`, `jobs`, `sessions`...) y las de Spatie (`roles`, `permissions`...) no se documentaron porque son de los paquetes.
+- **Alcance:** las 27 tablas del proyecto (negocio, ventas, taller, `users` y `menu_items`). Las tablas internas de Laravel (`cache`, `jobs`, `sessions`...) y las de Spatie (`roles`, `permissions`...) no se documentaron porque son de los paquetes.
 - **Verificación:** una consulta a `pg_description` sobre las tablas del proyecto debe dar cero columnas sin comentario. `01_schema.sql` y las migraciones se comparan con `pg_dump`, que incluye los comentarios.
 - **Mantenimiento:** una columna nueva sin `->comment()` incumple esta convención. Cuando una columna cambia de significado, se actualiza su comentario en la migración y en `01_schema.sql`.
 
@@ -127,3 +127,13 @@ Formato corto: contexto, decisión, consecuencia.
   - **Un puesto por especialidad** (`Mecánico de camiones`): multiplica el catálogo de puestos y los reportes por puesto dejan de ser comparables.
 - **Datos:** el seed clasifica los 30 modelos del catálogo: 16 `auto`, 11 `suv` y 3 `pickup` (Ranger, Hilux y Frontier). Es una clasificación por revisar. No se cargan especializaciones: sin filas, todos atienden todo.
 - **Pendiente:** el rol del Jefe Mecánico (`04`) es provisional (`mechanic`) hasta que el negocio defina si necesita uno propio.
+
+## 18. Entidades y municipios como catálogo (`states`, `cities`)
+- **Decisión:** la ciudad de sucursales y clientes deja de ser un texto (`city`) y pasa a ser una llave foránea (`city_id`) al catálogo `cities`, que pertenece a un estado de `states`. Los datos son los catálogos del INEGI: 32 entidades y 2,478 municipios.
+- **Por qué:** un texto libre admite variantes ("CDMX", "Ciudad de México") y no permite agrupar por estado. Con la llave foránea el motor rechaza un municipio inexistente y los reportes por estado salen con un `JOIN`.
+- **Seeders, no migraciones:** `StateSeeder` y `CitySeeder` leen los CSV de `backend/database/seeders/data` (UTF-8) y `DatabaseSeeder` los ejecuta primero. Se pueden repetir: insertan solo lo que falta. A diferencia de `job_titles`, ninguna regla del código usa estos datos, por eso no van en una migración. Los tests que necesiten municipios deben llamar a los seeders.
+- **Sin Laravel:** `database/schema/01_catalogos_mx.sql` se genera de los mismos CSV, con los mismos ids (se comparó con un hash de todas las filas). Aborta si las tablas ya tienen datos.
+- **Identidad de un municipio:** la clave de 3 dígitos se repite entre entidades, y hay nombres repetidos dentro de una entidad. Se busca siempre por la pareja (clave de entidad, clave de municipio), nunca por nombre.
+- **Ciudad de México:** no existe un municipio con ese nombre, solo 16 alcaldías. La sucursal Centro y los clientes que compran en ella usan Cuauhtémoc (`09`-`015`).
+- **Clientes de los seeds:** viven en el municipio de la sucursal donde compran, como antes con el texto de la ciudad. La distribución por sucursal no cambió.
+- **Archivo de origen:** los CSV del INEGI venían en ISO-8859-1. Se convirtieron a UTF-8 y el seeder rechaza un archivo que no lo sea. En `states.csv` la abreviatura de México traía un byte dañado y se corrigió a `Méx`.

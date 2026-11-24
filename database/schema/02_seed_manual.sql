@@ -4,11 +4,12 @@
 --
 --   psql -U agencia -d agencia -f database/schema/02_seed_manual.sql
 --
--- Requiere el esquema creado (php artisan migrate o 01_schema.sql).
+-- Requiere el esquema creado (php artisan migrate o 01_schema.sql) y el catálogo de entidades y municipios
+-- cargado (php artisan db:seed o database/schema/01_catalogos_mx.sql).
 -- VACÍA las tablas del negocio (y, por CASCADE, las facturas, pagos, bitácora y las tablas de la
 -- venta: accesorios, autos a cuenta, financiamiento, transferencias y comisiones, y las especializaciones
 -- de los empleados, que dependan de ellas) y reinicia sus ids antes de insertar, porque las ventas y órdenes se refieren a los
--- ids 1..N de este archivo. No toca los catálogos (`job_titles`, `vehicle_types`, `service_order_statuses`), `parts` ni `users`.
+-- ids 1..N de este archivo. No toca los catálogos (`states`, `cities`, `job_titles`, `vehicle_types`, `service_order_statuses`), `parts` ni `users`.
 --
 -- Las ventas históricas se cargan como cerradas (completed), sin accesorios, financiamiento, pagos ni
 -- comisiones. Tampoco se cargan reglas de comisión: las tasas las define el negocio (commission_rules).
@@ -29,11 +30,15 @@ TRUNCATE service_order_items, service_orders, service_types,
          sales, cars, employees, customers, branches
     RESTART IDENTITY CASCADE;
 
--- Requiere los puestos, los tipos de vehículo y los estatus que crean las migraciones (o el final de 01_schema.sql).
+-- Requiere los puestos, los tipos de vehículo y los estatus que crean las migraciones (o el final de 01_schema.sql),
+-- y las entidades y municipios (StateSeeder y CitySeeder, o 01_catalogos_mx.sql).
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM service_order_statuses WHERE code = 'delivered') THEN
         RAISE EXCEPTION 'Faltan los estatus de service_order_statuses: ejecuta php artisan migrate o 01_schema.sql';
+    END IF;
+    IF (SELECT count(*) FROM cities) <> 2478 OR (SELECT count(*) FROM states) <> 32 THEN
+        RAISE EXCEPTION 'Faltan las entidades y los municipios: ejecuta php artisan db:seed o 01_catalogos_mx.sql';
     END IF;
     IF (SELECT count(*) FROM vehicle_types WHERE code IN ('auto', 'suv', 'pickup', 'van', 'truck')) <> 5 THEN
         RAISE EXCEPTION 'Faltan los tipos de vehículo de vehicle_types: ejecuta php artisan migrate o 01_schema.sql';
@@ -43,26 +48,34 @@ BEGIN
     END IF;
 END $$;
 
--- Branches
-INSERT INTO branches (name, city, address) VALUES
-('Sucursal Centro', 'Ciudad de México', 'Av. Juárez 123'),
-('Sucursal Sur', 'Guadalajara', 'Av. López Mateos 456'),
-('Sucursal Norte', 'Monterrey', 'Calle Hidalgo 789');
+-- Municipio por clave del INEGI (entidad, municipio). Función temporal: solo existe en esta sesión.
+CREATE FUNCTION pg_temp.city_id(p_state_code text, p_city_code text) RETURNS bigint
+LANGUAGE sql STABLE AS $$
+    SELECT c.id FROM cities c JOIN states s ON s.id = c.state_id
+    WHERE s.code = p_state_code AND c.code = p_city_code
+$$;
 
--- Customers
-INSERT INTO customers (first_name, last_name, email, phone, city, registration_date) VALUES
-('Jesús', 'Pérez', 'jesus.perez@email.com', '555-1234', 'Ciudad de México', '2023-11-01'),
-('Ana', 'García', 'ana.garcia@email.com', '333-5678', 'Guadalajara', '2023-11-15'),
-('Pedro', 'López', 'pedro.lopez@email.com', '818-8765', 'Monterrey', '2023-12-05'),
-('María', 'Martínez', 'maria.mtz@email.com', '555-4321', 'Ciudad de México', '2024-01-10'),
-('Luis', 'Hernández', 'luis.hdz@email.com', '333-1122', 'Guadalajara', '2024-01-20'),
-('Laura', 'Gómez', 'laura.gomez@email.com', '555-9876', 'Ciudad de México', '2024-02-15'),
-('Roberto', 'Díaz', 'roberto.diaz@email.com', '818-5432', 'Monterrey', '2024-02-20'),
-('Carmen', 'Ruiz', 'carmen.ruiz@email.com', '333-8765', 'Guadalajara', '2024-03-05'),
-('Javier', 'Mendoza', 'javier.mtz@email.com', '555-3344', 'Ciudad de México', '2024-03-15'),
-('Elena', 'Torres', 'elena.torres@email.com', '818-2233', 'Monterrey', '2024-04-01'),
-('Diego', 'Silva', 'diego.silva@email.com', '333-9988', 'Guadalajara', '2024-04-10'),
-('Patricia', 'Rojas', 'patricia.rojas@email.com', '555-7766', 'Ciudad de México', '2024-05-05');
+-- Branches. Municipios: Ciudad de México = Cuauhtémoc (09-015, donde está Av. Juárez), Guadalajara = 14-039,
+-- Monterrey = 19-039.
+INSERT INTO branches (name, city_id, address) VALUES
+('Sucursal Centro', pg_temp.city_id('09', '015'), 'Av. Juárez 123'),
+('Sucursal Sur', pg_temp.city_id('14', '039'), 'Av. López Mateos 456'),
+('Sucursal Norte', pg_temp.city_id('19', '039'), 'Calle Hidalgo 789');
+
+-- Customers. Cada cliente vive en el municipio de la sucursal donde compra.
+INSERT INTO customers (first_name, last_name, email, phone, city_id, registration_date) VALUES
+('Jesús', 'Pérez', 'jesus.perez@email.com', '555-1234', pg_temp.city_id('09', '015'), '2023-11-01'),
+('Ana', 'García', 'ana.garcia@email.com', '333-5678', pg_temp.city_id('14', '039'), '2023-11-15'),
+('Pedro', 'López', 'pedro.lopez@email.com', '818-8765', pg_temp.city_id('19', '039'), '2023-12-05'),
+('María', 'Martínez', 'maria.mtz@email.com', '555-4321', pg_temp.city_id('09', '015'), '2024-01-10'),
+('Luis', 'Hernández', 'luis.hdz@email.com', '333-1122', pg_temp.city_id('14', '039'), '2024-01-20'),
+('Laura', 'Gómez', 'laura.gomez@email.com', '555-9876', pg_temp.city_id('09', '015'), '2024-02-15'),
+('Roberto', 'Díaz', 'roberto.diaz@email.com', '818-5432', pg_temp.city_id('19', '039'), '2024-02-20'),
+('Carmen', 'Ruiz', 'carmen.ruiz@email.com', '333-8765', pg_temp.city_id('14', '039'), '2024-03-05'),
+('Javier', 'Mendoza', 'javier.mtz@email.com', '555-3344', pg_temp.city_id('09', '015'), '2024-03-15'),
+('Elena', 'Torres', 'elena.torres@email.com', '818-2233', pg_temp.city_id('19', '039'), '2024-04-01'),
+('Diego', 'Silva', 'diego.silva@email.com', '333-9988', pg_temp.city_id('14', '039'), '2024-04-10'),
+('Patricia', 'Rojas', 'patricia.rojas@email.com', '555-7766', pg_temp.city_id('09', '015'), '2024-05-05');
 
 -- Employees
 INSERT INTO employees (first_name, last_name, job_title_id, branch_id) VALUES

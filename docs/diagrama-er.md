@@ -5,6 +5,9 @@ Base de datos `agencia` (PostgreSQL). Incluye las tablas del negocio, el módulo
 ```mermaid
 erDiagram
     %% Negocio
+    STATES ||--o{ CITIES : "contains"
+    CITIES ||--o{ BRANCHES : "locates"
+    CITIES ||--o{ CUSTOMERS : "hosts"
     BRANCHES ||--o{ EMPLOYEES : "employs"
     JOB_TITLES ||--o{ EMPLOYEES : "holds"
     VEHICLE_TYPES ||--o{ CARS : "classifies"
@@ -68,10 +71,24 @@ erDiagram
     PERMISSIONS |o--o{ MENU_ITEMS : "controls"
     MENU_ITEMS |o--o{ MENU_ITEMS : "parent of"
 
+    STATES {
+        bigint id PK
+        varchar code "2 digitos, INEGI"
+        varchar short_name
+        varchar name
+    }
+
+    CITIES {
+        bigint id PK
+        bigint state_id FK
+        varchar code "3 digitos, se repite entre estados"
+        varchar name
+    }
+
     BRANCHES {
         bigint id PK
         varchar name
-        varchar city
+        bigint city_id FK
         varchar address
     }
 
@@ -81,7 +98,7 @@ erDiagram
         varchar last_name
         varchar email UK
         varchar phone
-        varchar city
+        bigint city_id FK
         date registration_date
     }
 

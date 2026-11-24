@@ -9,7 +9,7 @@ Motor: PostgreSQL 17. El esquema vive en dos lugares que deben mantenerse idént
 
 Este documento detalla las tablas del negocio. Las reglas y flujos de las ventas (autos a cuenta, financiamiento, transferencias, comisiones) están en [`arquitectura-ventas.md`](arquitectura-ventas.md), y las del taller (estatus de las órdenes, refacciones, facturas y pagos) en [`arquitectura_servicios.md`](arquitectura_servicios.md).
 
-Los datos se cargan con `database/schema/02_seed_manual.sql` (conjunto pequeño) y `database/seeds-python/seed.py` (volumen). Ver [`database/seeds-python/README.md`](../database/seeds-python/README.md).
+Los catálogos de entidades y municipios se cargan con `StateSeeder` y `CitySeeder` (o `database/schema/01_catalogos_mx.sql`). Los datos del negocio, con `database/schema/02_seed_manual.sql` (conjunto pequeño) y `database/seeds-python/seed.py` (volumen). Ver [`database/seeds-python/README.md`](../database/seeds-python/README.md).
 
 > Para ver todas las tablas en un solo diagrama (negocio, usuarios, roles, permisos y menú), consulta [`diagrama-er.md`](diagrama-er.md).
 
@@ -30,6 +30,9 @@ Todas las tablas tienen además `created_at` y `updated_at` (no se dibujan para 
 
 ```mermaid
 erDiagram
+    STATES ||--o{ CITIES : "contains"
+    CITIES ||--o{ BRANCHES : "locates"
+    CITIES ||--o{ CUSTOMERS : "hosts"
     BRANCHES ||--o{ EMPLOYEES : "employs"
     JOB_TITLES ||--o{ EMPLOYEES : "holds"
     VEHICLE_TYPES ||--o{ CARS : "classifies"
@@ -49,10 +52,24 @@ erDiagram
     SERVICE_TYPES |o--o{ SERVICE_ORDER_ITEMS : "labor"
     PARTS |o--o{ SERVICE_ORDER_ITEMS : "part"
 
+    STATES {
+        bigint id PK
+        varchar code "2 digitos, INEGI"
+        varchar short_name
+        varchar name
+    }
+
+    CITIES {
+        bigint id PK
+        bigint state_id FK
+        varchar code "3 digitos, se repite entre estados"
+        varchar name
+    }
+
     BRANCHES {
         bigint id PK
         varchar name
-        varchar city
+        bigint city_id FK
         varchar address
     }
 
@@ -62,7 +79,7 @@ erDiagram
         varchar last_name
         varchar email UK
         varchar phone
-        varchar city
+        bigint city_id FK
         date registration_date
     }
 
@@ -199,13 +216,37 @@ erDiagram
 
 Las llaves foráneas de `employees` y `cars` aceptan `NULL` y no definen `ON DELETE`: el comportamiento por defecto rechaza el borrado de un registro con hijos. En las ventas y el taller (`sales`, `service_orders` y las tablas que dependen de ellas) las llaves de negocio son `ON DELETE RESTRICT`, y las que apuntan a `users` son `ON DELETE SET NULL` (excepto `sales.discount_approved_by_user_id`, que es `RESTRICT`). `created_at` y `updated_at` son `TIMESTAMP(0)` sin zona horaria y aceptan `NULL` (Eloquent los llena al crear y actualizar).
 
+### `states` (entidades federativas)
+
+Catálogo de las 32 entidades de México (INEGI). Lo carga `StateSeeder` desde `backend/database/seeders/data/states.csv` (UTF-8), o `database/schema/01_catalogos_mx.sql` si no se usa Laravel.
+
+| Columna | Tipo | Restricciones |
+| --- | --- | --- |
+| `id` | BIGSERIAL | PK. Sigue el orden del archivo |
+| `code` | VARCHAR(2) | NOT NULL. Clave de la entidad, por ejemplo `09` |
+| `short_name` | VARCHAR(6) | NOT NULL. Abreviatura, por ejemplo `CDMX` o `Q. Roo` |
+| `name` | VARCHAR(150) | NOT NULL. Por ejemplo `Ciudad de México` |
+
+### `cities` (municipios)
+
+Catálogo de los 2,478 municipios y alcaldías (INEGI). Lo carga `CitySeeder` desde `cities.csv`, después de `StateSeeder`. La clave del municipio **se repite entre entidades** (la clave `015` existe en 26 de las 32 entidades, cada vez con un municipio distinto): un municipio se identifica por la pareja (`states.code`, `cities.code`). Algunos nombres también se repiten dentro de una entidad (por ejemplo `San Juan Mixtepec`, claves `208` y `209` en Oaxaca), así que no se busca por nombre.
+
+| Columna | Tipo | Restricciones |
+| --- | --- | --- |
+| `id` | BIGSERIAL | PK. Sigue el orden del archivo |
+| `state_id` | BIGINT | NOT NULL, FK → `states`, `ON DELETE RESTRICT` |
+| `code` | VARCHAR(3) | NOT NULL. Clave del municipio, por ejemplo `015` |
+| `name` | VARCHAR(150) | NOT NULL. Por ejemplo `Cuauhtémoc` |
+
+La Ciudad de México no tiene un municipio con ese nombre: son 16 alcaldías (`002` a `017`). La sucursal Centro y los clientes que compran en ella usan Cuauhtémoc (`09`-`015`).
+
 ### `branches` (sucursales)
 
 | Columna | Tipo | Restricciones |
 | --- | --- | --- |
 | `id` | BIGSERIAL | PK |
 | `name` | VARCHAR(100) | NOT NULL |
-| `city` | VARCHAR(50) | NOT NULL |
+| `city_id` | BIGINT | NOT NULL, FK → `cities`, `ON DELETE RESTRICT`. Municipio donde se ubica |
 | `address` | VARCHAR(150) | NOT NULL |
 
 ### `customers` (clientes)
@@ -217,7 +258,7 @@ Las llaves foráneas de `employees` y `cars` aceptan `NULL` y no definen `ON DEL
 | `last_name` | VARCHAR(50) | NOT NULL |
 | `email` | VARCHAR(100) | NOT NULL, UNIQUE |
 | `phone` | VARCHAR(15) | |
-| `city` | VARCHAR(50) | |
+| `city_id` | BIGINT | NOT NULL, FK → `cities`, `ON DELETE RESTRICT`. Municipio de residencia |
 | `registration_date` | DATE | Por defecto `2023-01-01` |
 
 ### `job_titles` (puestos)
@@ -480,7 +521,8 @@ El modelo original (MySQL) usaba nombres en español. Los datos son los mismos: 
 | `detalle_servicio` | `service_order_items` |
 | `id_<tabla>` (PK) | `id` |
 | `id_<tabla>` (FK) | `<singular>_id` (`id_sucursal` → `branch_id`) |
-| `nombre`, `apellido`, `telefono`, `ciudad`, `direccion` | `first_name`/`name`, `last_name`, `phone`, `city`, `address` |
+| `nombre`, `apellido`, `telefono`, `direccion` | `first_name`/`name`, `last_name`, `phone`, `address` |
+| `ciudad` (texto) | `city_id` (FK al catálogo `cities`, por municipio del INEGI) |
 | `fecha_registro` | `registration_date` |
 | `puesto` | `job_title_id` (FK al catálogo `job_titles`) |
 | `marca`, `submarca`, `modelo` | `brand`, `model`, `model_year` |
