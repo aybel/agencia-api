@@ -149,7 +149,17 @@ Los permisos se crean con el guard `api` y se nombran `<recurso>.<acción>`:
 | `update` | Actualizar | `PUT /{id}` |
 | `delete` | Borrar | `DELETE /{id}` |
 
-Por ahora solo existen los de `branches`. `PermissionsSeeder` los crea y le asigna **todos** los permisos existentes al rol `admin`. Los demás roles (`manager`, `seller`, `service_advisor`, `mechanic`) aún no tienen permisos.
+Por ahora solo existen los de `branches`. `PermissionsSeeder` los crea y le asigna **todos** los permisos existentes al rol `admin`. Los demás roles reciben los de `ROLE_PERMISSIONS` en el mismo seeder (solo lectura por ahora):
+
+| Rol | Permisos |
+| --- | --- |
+| `admin` | Todos (se sincronizan en cada ejecución, incluidos los que cree el menú) |
+| `manager` | `branches.view_any`, `branches.view`, `sales.view`, `service_orders.view`, `service_types.view` |
+| `seller` | `branches.view_any`, `branches.view`, `sales.view` |
+| `service_advisor` | `branches.view_any`, `branches.view`, `service_orders.view`, `service_types.view` |
+| `mechanic` | `service_orders.view` |
+
+Los roles que no son `admin` se otorgan con `givePermissionTo`: volver a ejecutar el seeder agrega permisos pero no quita los que ajustes a mano.
 
 ### Tabla `menu_items`
 
@@ -174,7 +184,7 @@ Por ahora solo existen los de `branches`. `PermissionsSeeder` los crea y le asig
 |---|---|---|
 | 1 | `RolesSeeder` | Crea los 5 roles |
 | 2 | `MenuItemSeeder` | Crea o actualiza el menú desde el arreglo `menu()` y **crea los permisos** que ese menú menciona |
-| 3 | `PermissionsSeeder` | Crea los permisos de `RESOURCES` y le asigna a `admin` todos los permisos existentes |
+| 3 | `PermissionsSeeder` | Crea los permisos de `RESOURCES`, le asigna a `admin` todos los existentes y reparte los de `ROLE_PERMISSIONS` |
 | 4 | `AdminUserSeeder` | Crea el administrador desde `ADMIN_EMAIL` y `ADMIN_PASSWORD` |
 
 `PermissionsSeeder` va después del menú para que `admin` reciba también los permisos que crea el menú. Para ejecutar uno solo: `php artisan db:seed --class=PermissionsSeeder`.

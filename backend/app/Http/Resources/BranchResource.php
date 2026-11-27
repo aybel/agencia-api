@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Branch;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/** @mixin Branch */
 class BranchResource extends JsonResource
 {
     /**
@@ -15,12 +17,12 @@ class BranchResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => 'integer',
-            'name' => 'string',
-            'city_id' => 'integer',
-            'address' => 'string',
-            'created_at' => 'date',
-            'updated_at' => 'date',
+            'id' => $this->id,
+            'name' => $this->name,
+            'city_id' => $this->city_id,
+            'address' => $this->address,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

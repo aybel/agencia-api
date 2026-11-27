@@ -29,10 +29,40 @@ class PermissionsSeeder extends Seeder
     ];
 
     /**
-     * Crea los permisos y se los asigna al rol `admin`.
+     * Permisos de los demás roles (el rol `admin` siempre recibe todos). Los nombres deben existir:
+     * salen de RESOURCES o del menú (MenuItemSeeder). Si uno no existe, el seeder falla en lugar de
+     * ignorarlo, para detectar el error de escritura.
+     *
+     * Es el punto de partida. Los permisos de escritura de cada recurso se agregan aquí cuando existan
+     * sus endpoints. Se otorgan con `givePermissionTo` (no quita nada): si ajustas un rol a mano, volver
+     * a ejecutar el seeder no deshace tus cambios.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ROLE_PERMISSIONS = [
+        'manager' => [
+            'branches.view_any', 'branches.view',
+            'sales.view',
+            'service_orders.view', 'service_types.view',
+        ],
+        'seller' => [
+            'branches.view_any', 'branches.view',
+            'sales.view',
+        ],
+        'service_advisor' => [
+            'branches.view_any', 'branches.view',
+            'service_orders.view', 'service_types.view',
+        ],
+        'mechanic' => [
+            'service_orders.view',
+        ],
+    ];
+
+    /**
+     * Crea los permisos, se los asigna todos al rol `admin` y reparte los del resto de los roles.
      *
      * Es idempotente: ejecutarlo otra vez no duplica nada. Debe correr después de RolesSeeder
-     * (que crea el rol `admin`) y de MenuItemSeeder (que también crea permisos), para que el
+     * (que crea los roles) y de MenuItemSeeder (que también crea permisos), para que el
      * administrador reciba todos.
      */
     public function run(): void
@@ -46,8 +76,27 @@ class PermissionsSeeder extends Seeder
             }
         }
 
+        $this->grantPermissions();
+
         // Crear roles adicionales para el sistema ERP SE USARA DESPUÉS PARA CUANDO SE TENGAN LOS MODULOS
         // $this->createERPRoles(self::GUARD);
+    }
+
+    /**
+     * `admin` recibe todos los permisos del guard (sincroniza: si se crea uno nuevo, queda incluido).
+     * Los demás roles reciben los de ROLE_PERMISSIONS.
+     */
+    private function grantPermissions(): void
+    {
+        Role::findByName('admin', self::GUARD)
+            ->syncPermissions(Permission::where('guard_name', self::GUARD)->get());
+
+        foreach (self::ROLE_PERMISSIONS as $roleName => $permissions) {
+            Role::findByName($roleName, self::GUARD)->givePermissionTo($permissions);
+        }
+
+        // Los roles cambiaron: la caché de Spatie debe leerlos de nuevo.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**

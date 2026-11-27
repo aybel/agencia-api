@@ -20,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public array $bindings = [
         MenuItemRepositoryInterface::class => MenuItemRepository::class,
-        BranchRepositoryInterface::class=> BranchRepository::class,
+        BranchRepositoryInterface::class => BranchRepository::class,
     ];
 
     /**
