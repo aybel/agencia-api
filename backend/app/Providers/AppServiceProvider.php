@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Repositories\BranchRepository;
+use App\Repositories\BranchRepositoryInterface;
 use App\Repositories\MenuItemRepository;
 use App\Repositories\MenuItemRepositoryInterface;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -18,6 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public array $bindings = [
         MenuItemRepositoryInterface::class => MenuItemRepository::class,
+        BranchRepositoryInterface::class=> BranchRepository::class,
     ];
 
     /**

@@ -29,10 +29,8 @@ Route::prefix('v1')->group(function () {
 
             // Rutas para administrar sucursales
             Route::prefix('branches')->group(function () {
-                Route::get('/search', [BranchController::class, 'search'])->middleware('permission:branches.view_any');
                 Route::get('/filter', [BranchController::class, 'filter'])->middleware('permission:branches.view_any');
-                Route::get('/', [BranchController::class, 'index'])->middleware('permission:branches.view_any');
-                Route::get('/{id}', [BranchController::class, 'show'])->middleware('permission:branches.view');
+                Route::post('/filter', [BranchController::class, 'filter'])->middleware('permission:cars.view_any');
                 Route::post('/', [BranchController::class, 'store'])->middleware('permission:branches.create');
                 Route::put('/{id}', [BranchController::class, 'update'])->middleware('permission:branches.update');
                 Route::delete('/{id}', [BranchController::class, 'destroy'])->middleware('permission:branches.delete');
